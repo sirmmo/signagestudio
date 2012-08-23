@@ -1,0 +1,9 @@
+Your activation key: {{ activation_key }}
+
+Please use this link to activate your account:
+
+{{BASEURL}}accounts/activate/{{ activation_key }}/
+
+After activation you can login to the site:
+
+{{BASEURL}}accounts/login/

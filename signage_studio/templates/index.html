@@ -1,0 +1,112 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>Signage Studio</title>
+		<style>
+			@import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,900);
+			body{margin:0 0 0 0;}
+			header{
+				font-family: 'Source Sans Pro', cursive;
+				font-size: 55px;
+				color:#000;
+				background-color:#EDE9F5;
+				height:250px;
+				text-shadow: 0 1px 4px rgba(0,0,0,.3);
+				text-align: center;
+			}
+			.title{
+				display:block;
+				font-weight:900;
+				padding-top:50px;
+				margin-left:auto;
+				margin-right:auto;
+			}
+			.subtitle{
+				display:block;
+				font-family: Calibri, arial, helvetica, sans-serif;
+				font-weight:400;
+				font-size:25px;
+				margin-left:auto;
+				margin-right:auto;
+				
+			}
+			
+			#content{
+				width:50%;
+				margin-left:auto;
+				margin-right:auto;
+			}
+			
+			#login-form{
+				width:45%;
+				float:left;
+				display:block;
+			}
+			
+			#registration-form{
+				width:45%;
+				float:right;
+				display:block;
+			}
+			#splitter{
+				height:100px;
+				width: 10%;
+				float:left;
+				display:block;
+				
+			}
+			#splitter_line{
+				width:1px;
+				height:100px;
+				background-color:black;
+				margin-left:auto;
+				margin-right:auto;
+			}
+			footer{
+				font-family: Calibri, arial, helvetica, sans-serif;
+				font-size:small;
+				text-align: center;
+				clear:both;
+			}
+			.table {
+				display: table;
+				margin-left:auto;
+				margin-right:auto;
+			}
+			.row{
+				display: table-row;
+			}
+			.td{
+				display: table-cell;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<div class="title">Signage Studio</div>
+			<div class="subtitle">Your data, Your design... We put the rest!</div>
+		</header>
+		<div id="content">
+			<div id="lr">
+				<form id="login-form">
+					<div class="table">
+						<div class="row"><label class="td" for="log_username">username:</label><input class="td" type="text" id="log_username"/></div>
+						<div class="row"><label class="td" for="log_password">password:</label><input class="td" type="password" id="log_password"/></div>
+					</div>
+				</form>
+				<div id="splitter"> 
+					<div id="splitter_line"></div>
+					</div>
+			
+				<form id="registration-form">
+					<div class="table">
+						<div class="row"><label class="td" for="reg_username">username:</label><input class="td" type="text" id="reg_username"/></div>
+					</div>
+				</form>
+			</div>
+		</div>
+		<footer>
+			Signage Studio &copy; is a MMo.IT &copy; product. All Rights Reserved.
+		</footer>
+	</body>
+</html>

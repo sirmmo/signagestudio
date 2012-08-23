@@ -1,0 +1,667 @@
+<html>
+	<head>
+		<title>Signage Studio - Dashboard</title>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.0/jquery.min.js"></script>
+		<script src="/static/js/ich.min.js"></script>
+		<style>
+			@import url(/static/css/font-awesome.css);
+			@import url(/static/css/font-awesome-ie7.css);
+			@import url(http://fonts.googleapis.com/css?family=Source+Sans+Pro:400,900);
+			body{
+				margin:0 0 0 0;
+				font-family: 'Source Sans Pro', cursive;
+				overflow: hidden;
+				min-width: 1000px;
+			}
+			header{
+				color:#000;
+				background-color:#EDE9F5;
+				height:50px;
+				text-shadow: 0 1px 4px rgba(0,0,0,.3);
+				width:100%;
+			}
+			#title{
+				font-weight:900;
+				margin-left:auto;
+				margin-right:auto;
+			}
+			#brand{
+				float:left;
+				font-size: 35px;
+			}
+			#account{
+				font-weight:400;
+				padding-top:13px;
+				padding-right:5	px;
+				float:right;
+				font-size: 15px;
+			}
+			#campaigns{
+				position:relative;
+				font-size:15px;
+				top:-9px;
+				left:5px;
+			}
+			#campaigns:hover{
+				position:relative;
+				
+				font-size:15px;
+				top:-9px;
+				left:5px;
+				text-shadow: 1px 1px 4px rgb(0,0,0,0.8);
+			}
+			#lcontent{
+				display:block;
+				position:fixed;
+				width: 200px;
+				background-color: #EDE9F5;
+				float:left;
+			}
+			.panel_btn{
+				display:block;
+				padding-top:5px;
+				padding-bottom:5px;
+				padding-left:10px;
+			}
+			.panel_btn:hover{
+				background-color: #DACEF2;
+			}
+			
+			.panel_btn.selected{
+				background-color: #fff;
+			}
+			
+			#rcontent{
+				float:left;
+				margin-left:200px;
+				min-width: 800px;
+			}
+			
+			#map{
+				width:49%;
+				float:left;
+			}
+			.clickable:hover{
+				cursor: hand;
+			}
+			#selected_panel{
+				width:49%;
+				float:right;
+			}
+			#selected_panel_data{
+				display:table;
+			}
+			.row{
+				display: table-row;
+			}
+			.key, .value, .mkey{
+							display: table-cell;
+							padding-left:5px;
+			}
+			.key, .mkey{
+				font-weight: 900;
+			}
+			.selected_panel_block{
+				margin-bottom:10px;
+				border-left:2px solid #DACEF2;
+				border-bottom:2px solid #DACEF2;
+				padding-left:3px;
+				width:100%;
+				clear: both;
+				overflow: auto;
+			}
+			#selected_panel_setup{
+			}
+			#select_panel_buttons{
+				float:left;
+				margin-left:50px;
+				width:100px;	
+			}
+			#selected_panel_name .name{
+				float:left;			
+			}
+			.hidden {
+				display:none;
+			}
+			.rowcol{
+				display:table-row-group;
+			}
+			.panel_button{
+				display:inline-block;
+			}
+		
+		</style>
+		<script>
+		
+			var clickX;
+			var clickY;
+			var uclickX;
+			var uclickY;
+			var tX;
+			var tY;
+			var paint;
+			
+			var context; 
+			var canvas;
+			
+			var gcontext;
+			var gcanvas;
+			
+			var INTERVAL = 20; 
+			
+			var selectionHandles = [];
+			
+			var isDrag = false;
+			var isResizeDrag = false;
+			var expectResize = -1; // New, will save the # of the selection handle if the mouse is over one.
+			var mx, my; // mouse coordinates
+			
+			 // when set to true, the canvas will redraw everything
+			 // invalidate() just sets this to false right now
+			 // we want to call invalidate() whenever we make a change
+			var canvasValid = false;
+			
+			// The node (if any) being selected.
+			// If in the future we want to select multiple objects, this will get turned into an array
+			var mySel = null;
+			
+			// The selection color and width. Right now we have a red selection with a small width
+			var mySelColor = '#CC0000';
+			var mySelWidth = 2;
+			var mySelBoxColor = 'darkred'; // New for selection boxes
+			var mySelBoxSize = 6;
+			
+			// we use a fake canvas to draw individual shapes for selection testing
+			var ghostcanvas;
+			var gctx; // fake canvas context
+			
+			// since we can drag from anywhere in a node
+			// instead of just its x/y corner, we need to save
+			// the offset of the mouse when we start dragging.
+			var offsetx, offsety;
+			
+			// Padding and border style widths for mouse offsets
+			var stylePaddingLeft, stylePaddingTop, styleBorderLeft, styleBorderTop;
+
+
+
+			// Box object to hold data
+			function Box2() {
+			  this.x = 0;
+			  this.y = 0;
+			  this.w = 1; // default width and height?
+			  this.h = 1;
+			  this.fill = '#444444';
+			  this.name ="Box1";
+			  this.content="None";
+			}
+			Box2.prototype = {
+			  // we used to have a solo draw function
+			  // but now each box is responsible for its own drawing
+			  // mainDraw() will call this with the normal canvas
+			  // myDown will call this with the ghost canvas with 'black'
+			  draw: function(context, optionalColor) {
+			      if (context === gctx) {
+			        context.fillStyle = 'black'; // always want black for the ghost canvas
+			      } else {
+			        context.fillStyle = this.fill;
+			      }
+			      
+			      // We can skip the drawing of elements that have moved off the screen:
+			      if (this.x > canvas.width || this.y > canvas.heught) return; 
+			      if (this.x + this.w < 0 || this.y + this.h < 0) return;
+			      
+			      context.fillRect(this.x,this.y,this.w,this.h);
+			      context.fillStyle = 'black';
+			      
+			      context.fillText(this.name, this.x+3, this.y+10);
+			      
+			    // draw selection
+			    // this is a stroke along the box and also 8 new selection handles
+			    if (mySel === this) {
+			      context.strokeStyle = mySelColor;
+			      context.lineWidth = mySelWidth;
+			      context.strokeRect(this.x,this.y,this.w,this.h);
+			      
+			      // draw the boxes
+			      
+			      var half = mySelBoxSize / 2;
+			      
+			      // 0  1  2
+			      // 3     4
+			      // 5  6  7
+			      
+			      // top left, middle, right
+			      selectionHandles[0].x = this.x-half;
+			      selectionHandles[0].y = this.y-half;
+			      
+			      selectionHandles[1].x = this.x+this.w/2-half;
+			      selectionHandles[1].y = this.y-half;
+			      
+			      selectionHandles[2].x = this.x+this.w-half;
+			      selectionHandles[2].y = this.y-half;
+			      
+			      //middle left
+			      selectionHandles[3].x = this.x-half;
+			      selectionHandles[3].y = this.y+this.h/2-half;
+			      
+			      //middle right
+			      selectionHandles[4].x = this.x+this.w-half;
+			      selectionHandles[4].y = this.y+this.h/2-half;
+			      
+			      //bottom left, middle, right
+			      selectionHandles[6].x = this.x+this.w/2-half;
+			      selectionHandles[6].y = this.y+this.h-half;
+			      
+			      selectionHandles[5].x = this.x-half;
+			      selectionHandles[5].y = this.y+this.h-half;
+			      
+			      selectionHandles[7].x = this.x+this.w-half;
+			      selectionHandles[7].y = this.y+this.h-half;
+			
+			      
+			      context.fillStyle = mySelBoxColor;
+			      for (var i = 0; i < 8; i ++) {
+			        var cur = selectionHandles[i];
+			        context.fillRect(cur.x, cur.y, mySelBoxSize, mySelBoxSize);
+			      }
+			    }
+			    
+			  } // end draw
+			
+			}
+
+			var boxes2  =  [];
+			var ww;
+			var wh;
+			function do_refresh(){
+				$('#rcontent').width(ww-200-1);
+				$('#lcontent').height(wh-50);
+				h = wh-4-$('#selected_panel_name').children().height()-$('#selected_panel_data').parent().height()-$('#selected_panel_editor').parent().height()-50-40-140;
+				$('#selected_panel_setup').height(h);
+				$('.selected_panel_block').width($('#map').width()-4);
+			}
+			
+			function refresh(){ 
+				ww = $(window).width();
+				wh = $(window).height();
+				do_refresh();
+			}
+			
+			
+
+			
+		
+			//Initialize a new Box, add it, and invalidate the canvas
+			function addRect(x, y, w, h, fill) {
+			  var rect = new Box2;
+			  rect.x = x;
+			  rect.y = y;
+			  rect.w = w
+			  rect.h = h;
+			  rect.name="CIAO";
+			  rect.fill = fill;
+			  ich.block_description(this).appendTo($('#selected_panel_setup'))
+			  boxes2.push(rect);
+			  invalidate();
+			}
+				
+			$(window).resize(refresh);
+			$('#selected_panel_visual_button').live('click', function(){
+				$('#selected_panel_page_data').hide();
+				$('#selected_panel_page_visual').show();
+				do_refresh();
+			});
+			$('#selected_panel_data_button').live('click', function(){
+				$('#selected_panel_page_data').show();
+				$('#selected_panel_page_visual').hide();
+				do_refresh();
+			});
+		
+			function clear(c) {
+				c.clearRect(0, 0, canvas.width, canvas.height);
+			}
+			
+			function mainDraw() {
+			  if (canvasValid == false) {
+			    clear(context);
+			    
+			    // Add stuff you want drawn in the background all the time here
+			    
+			    // draw all boxes
+			    var l = boxes2.length;
+			    for (var i = 0; i < l; i++) {
+			      boxes2[i].draw(context); // we used to call drawshape, but now each box draws itself
+			    }
+			    
+			    // Add stuff you want drawn on top all the time here
+			    
+			    canvasValid = true;
+			  }
+			}
+			
+			function myMove(e){
+			  if (isDrag) {
+			    getMouse(e);
+			    
+			    mySel.x = mx - offsetx;
+			    mySel.y = my - offsety;   
+			    
+			    // something is changing position so we better invalidate the canvas!
+			    invalidate();
+			  } else if (isResizeDrag) {
+			    // time ro resize!
+			    var oldx = mySel.x;
+			    var oldy = mySel.y;
+			    
+			    // 0  1  2
+			    // 3     4
+			    // 5  6  7
+			    switch (expectResize) {
+			      case 0:
+			        mySel.x = mx;
+			        mySel.y = my;
+			        mySel.w += oldx - mx;
+			        mySel.h += oldy - my;
+			        break;
+			      case 1:
+			        mySel.y = my;
+			        mySel.h += oldy - my;
+			        break;
+			      case 2:
+			        mySel.y = my;
+			        mySel.w = mx - oldx;
+			        mySel.h += oldy - my;
+			        break;
+			      case 3:
+			        mySel.x = mx;
+			        mySel.w += oldx - mx;
+			        break;
+			      case 4:
+			        mySel.w = mx - oldx;
+			        break;
+			      case 5:
+			        mySel.x = mx;
+			        mySel.w += oldx - mx;
+			        mySel.h = my - oldy;
+			        break;
+			      case 6:
+			        mySel.h = my - oldy;
+			        break;
+			      case 7:
+			        mySel.w = mx - oldx;
+			        mySel.h = my - oldy;
+			        break;
+			    }
+			    
+			    invalidate();
+			  }
+			  
+			  getMouse(e);
+			  // if there's a selection see if we grabbed one of the selection handles
+			  if (mySel !== null && !isResizeDrag) {
+			    for (var i = 0; i < 8; i++) {
+			      // 0  1  2
+			      // 3     4
+			      // 5  6  7
+			      
+			      var cur = selectionHandles[i];
+			      
+			      // we dont need to use the ghost context because
+			      // selection handles will always be rectangles
+			      if (mx >= cur.x && mx <= cur.x + mySelBoxSize &&
+			          my >= cur.y && my <= cur.y + mySelBoxSize) {
+			        // we found one!
+			        expectResize = i;
+			        invalidate();
+			        
+			        switch (i) {
+			          case 0:
+			            this.style.cursor='nw-resize';
+			            break;
+			          case 1:
+			            this.style.cursor='n-resize';
+			            break;
+			          case 2:
+			            this.style.cursor='ne-resize';
+			            break;
+			          case 3:
+			            this.style.cursor='w-resize';
+			            break;
+			          case 4:
+			            this.style.cursor='e-resize';
+			            break;
+			          case 5:
+			            this.style.cursor='sw-resize';
+			            break;
+			          case 6:
+			            this.style.cursor='s-resize';
+			            break;
+			          case 7:
+			            this.style.cursor='se-resize';
+			            break;
+			        }
+			        return;
+			      }
+			      
+			    }
+			    // not over a selection box, return to normal
+			    isResizeDrag = false;
+			    expectResize = -1;
+			    this.style.cursor='auto';
+			  }
+			  
+			}
+			
+			function myDown(e){
+			  getMouse(e);
+			  
+			  //we are over a selection box
+			  if (expectResize !== -1) {
+			    isResizeDrag = true;
+			    return;
+			  }
+			  
+			  clear(gcontext);
+			  var l = boxes2.length;
+			  for (var i = l-1; i >= 0; i--) {
+			    // draw shape onto ghost context
+			    boxes2[i].draw(gcontext, 'black');
+			    
+			    // get image data at the mouse x,y pixel
+			    var imageData = gcontext.getImageData(mx, my, 1, 1);
+			    var index = (mx + my * imageData.width) * 4;
+			    
+			    // if the mouse pixel exists, select and break
+			    if (imageData.data[3] > 0) {
+			      mySel = boxes2[i];
+			      offsetx = mx - mySel.x;
+			      offsety = my - mySel.y;
+			      mySel.x = mx - offsetx;
+			      mySel.y = my - offsety;
+			      isDrag = true;
+			      
+			      invalidate();
+			      clear(gcontext);
+			      return;
+			    }
+			    
+			  }
+			  // havent returned means we have selected nothing
+			  mySel = null;
+			  // clear the ghost canvas for next time
+			  clear(gcontext);
+			  // invalidate because we might need the selection border to disappear
+			  invalidate();
+			}
+			
+			function myUp(){
+			  isDrag = false;
+			  isResizeDrag = false;
+			  expectResize = -1;
+			}
+			
+			// adds a new node
+			function myDblClick(e) {
+			  getMouse(e);
+			  // for this method width and height determine the starting X and Y, too.
+			  // so I left them as vars in case someone wanted to make them args for something and copy this code
+			  var width = 20;
+			  var height = 20;
+			  addRect(mx - (width / 2), my - (height / 2), width, height, 'rgba(220,205,65,0.7)');
+			}
+			
+			
+			function invalidate() {
+			  canvasValid = false;
+			}
+						
+			// Sets mx,my to the mouse position relative to the canvas
+			// unfortunately this can be tricky, we have to worry about padding and borders
+			function getMouse(e) {
+			      var element = canvas, offsetX = 0, offsetY = 0;
+			
+			      if (element.offsetParent) {
+			        do {
+			          offsetX += element.offsetLeft;
+			          offsetY += element.offsetTop;
+			        } while ((element = element.offsetParent));
+			      }
+			
+			      // Add padding and border style widths to offset
+			      offsetX += stylePaddingLeft;
+			      offsetY += stylePaddingTop;
+			
+			      offsetX += styleBorderLeft;
+			      offsetY += styleBorderTop;
+			
+			      mx = e.pageX - offsetX;
+			      my = e.pageY - offsetY
+			}
+			$(function(){
+				refresh();
+				canvas = document.getElementById('selected_panel_canvas');
+				context = canvas.getContext("2d");
+				gcanvas = document.createElement('canvas');
+				gcanvas.height = canvas.height;
+				gcanvas.width = canvas.width;
+				gcontext = gcanvas.getContext('2d');
+				canvas.onselectstart = function () { return false; }
+				if (document.defaultView && document.defaultView.getComputedStyle) {
+				    stylePaddingLeft = parseInt(document.defaultView.getComputedStyle(canvas, null)['paddingLeft'], 10)     || 0;
+				    stylePaddingTop  = parseInt(document.defaultView.getComputedStyle(canvas, null)['paddingTop'], 10)      || 0;
+				    styleBorderLeft  = parseInt(document.defaultView.getComputedStyle(canvas, null)['borderLeftWidth'], 10) || 0;
+					styleBorderTop   = parseInt(document.defaultView.getComputedStyle(canvas, null)['borderTopWidth'], 10)  || 0;
+				}
+				setInterval(mainDraw, INTERVAL);
+				canvas.onmousedown = myDown;
+				canvas.onmouseup = myUp;
+				canvas.ondblclick = myDblClick;
+				canvas.onmousemove = myMove;
+				for (var i = 0; i < 8; i ++) {
+					var rect = new Box2;
+					selectionHandles.push(rect);
+				}
+			});
+			
+		</script>
+		<script id="block_description" type="text/html">
+			<div class="rowcol" data-x="{% templatetag openvariable %}x{% templatetag closevariable %}" data-y="{% templatetag openvariable %}y{% templatetag closevariable %}" data-width="{% templatetag openvariable %}w{% templatetag closevariable %}" data-height="{% templatetag openvariable %}h{% templatetag closevariable %}" data-name="{% templatetag openvariable %}name{% templatetag closevariable %}">
+				<div class="row">
+					<span class="mkey">{% templatetag openvariable %}name{% templatetag closevariable %}:</span>
+					<span class="key">Width:</span>
+					<span class="value">{% templatetag openvariable %}w{% templatetag closevariable %}</span>
+					<span class="edit">edit</span>
+				</div>
+				<div class="row">
+					<span class="mkey"> </span>
+					<span class="key">Height:</span>
+					<span class="value">{% templatetag openvariable %}h{% templatetag closevariable %}</span>
+					<span class="edit">edit</span>
+				</div>
+				<div class="row">
+					<span class="mkey"> </span>
+					<span class="key">X:</span>
+					<span class="value">{% templatetag openvariable %}x{% templatetag closevariable %}</span>
+					<span class="edit">edit</span>
+				</div>
+				<div class="row">
+					<span class="mkey"> </span>
+					<span class="key">Y:</span>
+					<span class="value">{% templatetag openvariable %}y{% templatetag closevariable %}</span>
+					<span class="edit">edit</span>
+				</div>
+				<div class="row">
+					<span class="mkey"> </span>
+					<span class="key">Content:</span>
+					<span class="value">200</span>
+					<span class="edit">edit</span>
+				</div>
+			</div>
+		</script>
+	</head>
+	<body>
+		<header>
+			<div id="brand"><span id="title">Signage Studio</span> - <span id="campaign">Lafodia Resort</span> <span id="campaigns" class="icon-sort-down clickable"> </span></div>
+			<div id="account"><span id="account_edit" class="clickable">Edit Account Details</span></div>
+		</header>
+		<nav> </nav>
+		<div id="content">
+			<div id="lcontent">
+				<div class="panel_btn" id="panel_add">
+					+ Add Panel
+				</div>
+				<div  id="panel_list">
+					<div class="panel_btn clickable selected" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+					<div class="panel_btn clickable" data-panel="panel-1">Panel 1</div>
+				</div>
+			</div>
+			<div id="rcontent">
+				<div id="map"><img src="asd" height="100" width="250"></div>
+				<div id="selected_panel">
+					<h3 id="selected_panel_name"><span class="name">Panel1</span> 
+						<div id="select_panel_buttons">
+							<span id="selected_panel_visual_button" class="panel_button icon-eye-open clickable"></span>
+							<span id="selected_panel_data_button" class="panel_button icon-th-list clickable"></span>
+						</div>
+					</h3>
+					<div class="selected_panel_page" id="selected_panel_page_data">
+						<div class="selected_panel_block">
+							<div id="selected_panel_data">
+								<div class="row" id="selected_panel_width"><span class="key">Width:</span><span class="value">1920</span></div>
+								<div class="row"  id="selected_panel_height"><span class="key">Height:</span><span class="value">1080</span></div>
+								<div class="row"  id="selected_panel_os"><span class="key">Operating System:</span><span class="value">Windows</span></div>
+							</div>
+						</div>
+					</div>
+					<div class="selected_panel_page hidden" id="selected_panel_page_visual">
+						<div class="selected_panel_block">
+							<div  id="selected_panel_editor">
+								<div id="selected_panel_editor_buttons">
+									<span id="selected_panel_editor_button_background">Upload background</span>
+								</div>
+								<canvas width="392" height="216" id="selected_panel_canvas"></canvas>
+							</div>
+						</div>
+					</div>
+						<div class="selected_panel_block" >
+							<div id="selected_panel_setup">
+								
+							
+								
+							</div>
+						</div>
+					
+				</div>
+			</div>
+
+		</div>
+		<footer></footer>
+	</body>
+</html>
